@@ -24,7 +24,7 @@ thermo          100
 
 # Quenching to zero
 
-fix              1  all npt temp 650 $T ${damp_T} iso 0.0 0.0 ${damp_p} fixedpoint 0.0 0.0 0.0
+fix              1  all npt temp 10 $T ${damp_T} iso 0.0 0.0 ${damp_p} fixedpoint 0.0 0.0 0.0
 run              100000
 unfix            1
 reset_timestep   0
