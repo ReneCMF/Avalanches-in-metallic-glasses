@@ -1,0 +1,42 @@
+#Rene Alvarez
+
+#------------------------------- Random number generator --------------------------------#
+
+  # Initializes random number generator
+
+  variable      rnd equal round(random(0,999999,${RANDOM}))
+
+# Simulation variables
+
+  variable        T         equal     2000
+
+# Time variables
+
+variable        t_qu      equal     1990000          # Cooling rate 1 K/ps
+variable        dt        equal     0.001            # Time step
+variable        damp_t    equal     200*${dt}        # Thermostat damping
+variable        damp_p    equal     2500*${dt}       # Barostat damping
+
+#----------------------------------------------------------------------------------------#
+
+units           metal
+atom_style      atomic
+read_data       Liquid_Zr50Cu50_2000K_0bars_10000_atoms.dat 
+pair_style      eam/alloy
+pair_coeff      * * potentials/ZrCuAl.lammps.eam Zr Cu 
+
+#------------------                 Cooling at 1 K/ps          ----------------------------
+
+
+# Quenching 1000 K 
+
+ thermo 1000
+ variable         Temp   equal temp
+ variable         energy equal pe/atoms
+ variable         volume equal vol/atoms
+ fix              1  all npt temp $T 10 ${damp_t} iso 0.0 0.0 ${damp_p} fixedpoint 0.0 0.0 0.0
+ fix              2  all print 1000 "${Temp} ${energy} ${volume}" file Cooling_Zr50Cu50.dat
+ run ${t_qu}
+ write_restart    glass_10K_Zr50Cu50.restart
+ unfix  1
+ unfix  2

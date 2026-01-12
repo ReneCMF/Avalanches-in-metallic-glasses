@@ -1,0 +1,71 @@
+# Rene Alvarez - ralvarez@ncbj.gov.pl
+
+#------------------------------- Random number generator --------------------------------#
+
+  # Initializes random number generator
+
+  variable      rnd equal round(random(0,999999,${RANDOM}))
+  variable      T   index  10
+  label         RESTART
+
+#----------------------------------------------------------------------------------------#
+
+#------------------------------ General variables ---------------------------------------#
+ # Simulation variables
+
+
+  # Time variables
+
+  variable        t_eq      equal     10000           # Equlibration time
+  variable        dt        equal     0.001           # Time step
+  variable        damp_t    equal     200*${dt}       # Thermostat damping
+  variable        damp_p    equal     5000*${dt}      # Barostat damping
+
+#----------------------------------------------------------------------------------------#
+
+
+# Interatomic potential information.
+
+  units           metal
+  atom_style      atomic
+  read_restart    NpT_samples/glass_10K_Zr50Cu50.restart
+  pair_style      eam/alloy
+  pair_coeff      * * potentials/ZrCuAl.lammps.eam Zr Cu 
+  timestep        ${dt}
+
+#---------------------------------   Equilibrate in NPT ensemble  ----------------------#
+  thermo          10
+
+#----------------------------              From NPT to NVT             -------------------------------------------
+
+  fix              1           all   npt  temp  $T $T 0.10 iso 0.0 0.0 5.0 fixedpoint 0.0 0.0 0.0
+  variable         dx          equal lx
+  variable         dy          equal ly
+  variable         dz          equal lz
+  fix              2           all        vector  1    v_dx
+  fix              3           all        vector  1    v_dy
+  fix              4           all        vector  1    v_dz
+  thermo_style     custom      step       v_dx    v_dy v_dz
+  run              ${t_eq}
+  unfix            1
+  variable         lx_med       equal (ave(f_2))/2.0
+  variable         ly_med       equal (ave(f_3))/2.0
+  variable         lz_med       equal (ave(f_4))/2.0
+#---------------------------              Switching NVT               -------------------------------------------
+
+  change_box       all         x final -${lx_med} ${lx_med} y final -${ly_med} ${ly_med} &
+                               z final -${lz_med} ${lz_med} remap units box
+  unfix             2
+  unfix             3
+  unfix             4
+
+#--------------------------           Equilibrate in NVT ensemble                    --------------------------
+
+  reset_timestep    0
+
+  fix                1          all  nvt  temp $T $T ${damp_t}
+  dump               data       all  xyz  100  Zr50Cu50_glass_NVT_$TK.xyz
+  run                ${t_eq}
+  write_data         Zr50Cu50_NVT_$T_glass.dat
+  unfix              1
+
