@@ -1,91 +1,82 @@
 # CuZr glass N = 10000, p = 0, T = 0K
 
-# Initial definitions 
+# Initial definitions
 
 units           metal                                                    # time=ps,p=bars,E=eV,V=A^3
 boundary        p p p                                                    # periodic boundary condition
 atom_style      atomic                                                   # the systems have charge
-variable        T                                 equal 0.01             # Simulation temperature.
-variable        t_fs                              equal 100000000000000  # forward shear.
+variable        i                                 loop  2500             # Deformation up to 25%
 variable        dt                                equal 0.001            # Timestep.
 variable        damp_T                            equal 100*${dt}        # Thermostat damp parameter.
 variable        damp_p                            equal 2500*${dt}       # Barostat damping
-variable        dgamma                            equal 1e-1             # Deformation
-read_data       CuZrAl_MD_650.dat                                        # Glass obtained by cooling 100K/ns
+variable        epsilon                           equal 1e-4
+variable        gamma                             equal 1e-4             # Deformation step
+variable        dgamma                            equal ${gamma}/${dt}   # Initial deformation
+read_data       ../Zr36Cu64_NVT_10_glass.dat                             # Glass obtained by cooling 100K/ns
 
 
 # Interatomic interactions
 
-pair_style            eam/alloy
-pair_coeff            * * ZrCuAl.lammps.eam Zr Cu Al
-
+pair_style      eam/alloy
+pair_coeff      * * ../potentials/ZrCuAl.lammps.eam Zr Cu
 
 thermo          100
 
-# Quenching to zero
+# Simple shear xy direction up to gamma = 0.25
 
-fix              1  all npt temp 10 $T ${damp_T} iso 0.0 0.0 ${damp_p} fixedpoint 0.0 0.0 0.0
-run              100000
-unfix            1
-reset_timestep   0
+compute         peall        all   pe
+compute         pe_per_atom  all   pe/atom
+compute         S            all   stress/atom NULL
+compute         pxy          all   reduce sum c_S[4]
+variable        tau          equal c_pxy/vol
+change_box      all          triclinic
+variable        maxforce     equal abs(fmax)
+thermo_style    custom       step temp press pe v_tau
 
-# from NpT to NVT
+min_style       fire
+minimize        1e-15 1e-15 10000 10000
+run             0
+write_dump all custom Dumps/reference_state.dat id type xu yu zu c_pe_per_atom
 
-fix              1           all   npt  temp  $T $T 0.10 iso 0.0 0.0 5.0 fixedpoint 0.0 0.0 0.0
-variable         dx          equal lx
-variable         dy          equal ly
-variable         dz          equal lz
-fix              2           all        vector  1    v_dx
-fix              3           all        vector  1    v_dy
-fix              4           all        vector  1    v_dz
-thermo_style     custom      step       v_dx    v_dy v_dz
-run              10000
-unfix            1
-variable         lx_med       equal (ave(f_2))/2.0
-variable         ly_med       equal (ave(f_3))/2.0
-variable         lz_med       equal (ave(f_4))/2.0
-change_box       all         x final -${lx_med} ${lx_med} y final -${ly_med} ${ly_med} &
-                               z final -${lz_med} ${lz_med} remap units box
-unfix             2
-unfix             3
-unfix             4
-reset_timestep    0
-fix               1          all  nvt  temp $T $T ${damp_T}
-run               10000
-unfix             1
-reset_timestep    0
+# AQS Deformation
 
-# Shear setup
+min_style       fire
+label           aqs
 
-change_box      all triclinic
+# Stress and Strain
+
 variable        strain_xy  equal   "xy/ly"
 variable        SS_xy      equal   "-pxy/10000"
-variable        maxforce equal abs(fmax)
-thermo_style    custom      step   temp press v_strain_xy v_maxforce
 
-# AQS Deformation 
+# Capture energy of the RELAXED state from the PREVIOUS step
 
-print           "#Data for deformation" file SS.dat
-label           loop_f1
-variable        a          loop     ${t_fs}
-fix             3          all      deform      1      xy     erate     ${dgamma}  remap x
-run             1
-if              "${strain_xy} > 0.2" then "jump SELF break_f1"
-print           "${strain_xy} ${SS_xy}" &
-                 append  SS.dat screen no
+variable pe_start equal $(c_peall)
+variable tau_start equal ${tau}
 
-variable        maxforce equal abs(fmax)
+# Apply Deformation (This raises the energy)
 
-# Minimization
+fix 1 all deform 1 xy erate ${dgamma} remap x units box
+run 1
+unfix 1
 
-fix              HALT all halt 1 v_maxforce  < 1e-8 error continue
-min_style        fire 
-minimize         0.0 1e-8 500000 500000
-#run              1e6
-unfix            HALT
-next             a
-jump             aqs.lmp    loop_f1
-label            break_f1
-unfix            3
-variable         a           delete
+# Relax (This lowers the energy)
 
+minimize 1e-12 1e-12 10000 10000
+
+# Calculate Total Step Change
+
+variable dE_step   equal (c_peall-${pe_start})/atoms
+variable dtau_step equal (${tau}-${tau_start})
+variable gamma_val equal (${i}*${epsilon})
+
+print "${strain_xy} ${SS_xy} ${dE_step} ${dtau_step}" append avalanches.dat
+
+# Avalanche detection
+# Avalanches are usually characterized by a drop in stress (dtau_step < 0)
+# and a specific energy signature.
+
+if "${dE_step} < -5e-6" then &
+   "write_dump all custom Dumps/avalanche_${gamma_val}.dat id type xu yu zu c_pe_per_atom"
+
+    next i
+    jump SELF aqs
