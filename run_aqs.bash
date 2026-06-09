@@ -51,7 +51,7 @@ for FILEPATH in  ../fix_vol/Glass_N_2*_NVT_final.dat; do
     # Run LAMMPS
     # Output is piped to a unique log for each sample to avoid overwriting
     mpirun -n 120 /home/des01/aantone/ralvarez/mylammps/src/lmp_mpi \
-           -in aqs_Umut_v.lmp \
+           -in AQS.lmp \
            -var fname "$FNAME" \
            -var START_STEP "$START_STEP" > "log.${FNAME}"
 
