@@ -276,29 +276,8 @@ The Bash script checks for this message in the sample-specific log file. If the 
 
 ## Important notes before running
 
-### 1. Check script names
 
-In the uploaded files, the AQS input file is named:
-
-```text
-AQS.lmp
-```
-
-but `run_aqs.bash` currently calls:
-
-```bash
--in aqs_Umut_v.lmp
-```
-
-Make sure the filename in `run_aqs.bash` matches the actual AQS input file. For example, change it to:
-
-```bash
--in AQS.lmp
-```
-
-if that is the file you want to run.
-
-### 2. Check relative paths
+### 1. Check relative paths
 
 `AQS.lmp` reads configurations from:
 
@@ -314,7 +293,7 @@ while the run script loops over:
 
 This means `run_aqs.bash` is expected to be launched from a directory where `../fix_vol/` exists. If your directory structure is different, update the path accordingly.
 
-### 3. Create output directories
+### 2. Create output directories
 
 Before running the full workflow, make sure the required directories exist:
 
@@ -322,7 +301,7 @@ Before running the full workflow, make sure the required directories exist:
 mkdir -p potentials NpT_samples samples fix_vol Avalanches Dumps Restarts
 ```
 
-### 4. Cluster-specific settings
+### 3. Cluster-specific settings
 
 The provided run scripts are written for a PBS environment and load the following modules:
 
