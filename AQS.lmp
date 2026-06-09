@@ -16,7 +16,7 @@ if "$(is_defined(variable,START_STEP)) == 0" then "variable START_STEP equal 1"
 
 read_data        ../fix_vol/${fname}.dat
 pair_style       eam/alloy
-pair_coeff       * * ../potentials/ZrCuAl.lammps.eam Zr Cu
+pair_coeff       * * potentials/ZrCuAl.lammps.eam Zr Cu
 
 # --- Computes ---
 compute          peall        all   pe
